@@ -43,7 +43,7 @@ public class ReportService {
             currencyExchangeVO.setQuantity(quantity);
             currencyExchangeVOList.add(currencyExchangeVO);
         });
-        currencyReportVO.setCurrencyExchangeVO(currencyExchangeVOList);
+        currencyReportVO.setCurrencyExchangeVOList(currencyExchangeVOList);
         Calendar cal = Calendar.getInstance();
         cal.add(Calendar.HOUR_OF_DAY, -hours);
         Date fromDate = cal.getTime();
