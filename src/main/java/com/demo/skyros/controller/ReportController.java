@@ -14,12 +14,12 @@ public class ReportController {
 
     @GetMapping("send-currency-conversion-report")
     public CurrencyReportVO sendCurrencyConversionReport() {
-        return getReportService().sendCurrencyConversionReport();
+        return getReportService().prepareCurrencyConversionReportData();
     }
 
     @GetMapping("send-currency-exchange-report")
     public CurrencyReportVO sendCurrencyExchangeReport() {
-        return getReportService().sendCurrencyExchangeReport();
+        return getReportService().prepareCurrencyExchangeReportData();
     }
 
     public ReportService getReportService() {

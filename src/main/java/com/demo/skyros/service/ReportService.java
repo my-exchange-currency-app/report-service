@@ -1,10 +1,12 @@
 package com.demo.skyros.service;
 
 import com.demo.skyros.entity.ClientRequestEntity;
+import com.demo.skyros.proxy.CurrencyMailProxy;
 import com.demo.skyros.vo.CurrencyExchangeVO;
 import com.demo.skyros.vo.CurrencyReportVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -17,16 +19,37 @@ public class ReportService {
     @Autowired
     private ClientRequestService clientRequestService;
 
+    @Autowired
+    private CurrencyMailProxy currencyMailProxy;
+
     @Value("${report.hours}")
     private int hours;
 
-    public CurrencyReportVO sendCurrencyConversionReport() {
+    @Scheduled(cron = "${currency.conversion.report.cron}")
+    public void sendCurrencyConversionReport() {
+        CurrencyReportVO currencyReportVO = prepareCurrencyConversionReportData();
+        List<CurrencyExchangeVO> list = currencyReportVO.getCurrencyExchangeVOList();
+        if (!list.isEmpty()) {
+            getCurrencyMailProxy().transactionsReport(currencyReportVO);
+        }
+    }
+
+    @Scheduled(cron = "${currency.inquiry.report.cron}")
+    public void sendCurrencyExchangeReport() {
+        CurrencyReportVO currencyReportVO = prepareCurrencyExchangeReportData();
+        List<CurrencyExchangeVO> list = currencyReportVO.getCurrencyExchangeVOList();
+        if (!list.isEmpty()) {
+            getCurrencyMailProxy().inquiryReport(currencyReportVO);
+        }
+    }
+
+    public CurrencyReportVO prepareCurrencyConversionReportData() {
         Map<Map<String, String>, BigDecimal> currencyConversionRequests = prepareCurrencyConversionRequests(prepareClientRequest("conversion"));
         CurrencyReportVO currencyReportVO = prepareCurrencyReportVO(currencyConversionRequests);
         return currencyReportVO;
     }
 
-    public CurrencyReportVO sendCurrencyExchangeReport() {
+    public CurrencyReportVO prepareCurrencyExchangeReportData() {
         Map<Map<String, String>, BigDecimal> currencyConversionRequests = prepareCurrencyExchangeRequests(prepareClientRequest("exchange"));
         CurrencyReportVO currencyReportVO = prepareCurrencyReportVO(currencyConversionRequests);
         return currencyReportVO;
@@ -115,5 +138,13 @@ public class ReportService {
 
     public void setClientRequestService(ClientRequestService clientRequestService) {
         this.clientRequestService = clientRequestService;
+    }
+
+    public CurrencyMailProxy getCurrencyMailProxy() {
+        return currencyMailProxy;
+    }
+
+    public void setCurrencyMailProxy(CurrencyMailProxy currencyMailProxy) {
+        this.currencyMailProxy = currencyMailProxy;
     }
 }
