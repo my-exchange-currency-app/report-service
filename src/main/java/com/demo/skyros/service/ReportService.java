@@ -1,26 +1,40 @@
 package com.demo.skyros.service;
 
-import com.demo.skyros.entity.ClientRequestEntity;
 import com.demo.skyros.proxy.CurrencyMailProxy;
+import com.demo.skyros.proxy.LoggingProxy;
 import com.demo.skyros.vo.CurrencyExchangeVO;
 import com.demo.skyros.vo.CurrencyReportVO;
+import com.demo.skyros.vo.RequestCriteria;
+import com.demo.skyros.vo.RequestVO;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@Setter
+@Getter
 public class ReportService {
 
     @Autowired
-    private ClientRequestService clientRequestService;
+    private LoggingProxy loggingProxy;
 
     @Autowired
     private CurrencyMailProxy currencyMailProxy;
+
+    private GsonBuilder builder = new GsonBuilder();
+
+    private Gson gson = builder.create();
 
     @Value("${report.hours}")
     private int hours;
@@ -75,27 +89,38 @@ public class ReportService {
         return currencyReportVO;
     }
 
-    public List<ClientRequestEntity> prepareClientRequest(String tag) {
-        Date toDate = new Date();
+    public List<RequestVO> prepareClientRequest(String tag) {
+        Date toDate = formatDate(new Date());
         Calendar cal = Calendar.getInstance();
         cal.add(Calendar.HOUR_OF_DAY, -hours);
-        Date fromDate = cal.getTime();
-        List<ClientRequestEntity> requestEntities = getClientRequestService().findClientRequestPerDate(fromDate, toDate);
+        Date fromDate = formatDate(cal.getTime());
+        RequestCriteria requestCriteria = new RequestCriteria(cal.getTime(), new Date());
+        List<RequestVO> requestEntities = getLoggingProxy().findClientRequestPerDate(requestCriteria);
         return prepareClientRequestByTag(requestEntities, tag);
     }
 
+    private Date formatDate(Date date) {
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+        try {
+            return format.parse(format.format(date));
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        return new Date();
+    }
 
-    public List<ClientRequestEntity> prepareClientRequestByTag(List<ClientRequestEntity> clientRequestList, String tag) {
+
+    public List<RequestVO> prepareClientRequestByTag(List<RequestVO> clientRequestList, String tag) {
         if (null != clientRequestList && !clientRequestList.isEmpty()) {
             return clientRequestList.stream().filter(clientRequestEntity -> tag.equals(clientRequestEntity.getTag())).collect(Collectors.toList());
         }
         return new ArrayList<>();
     }
 
-    public Map<Map<String, String>, BigDecimal> prepareCurrencyConversionRequests(List<ClientRequestEntity> clientRequestList) {
+    public Map<Map<String, String>, BigDecimal> prepareCurrencyConversionRequests(List<RequestVO> clientRequestList) {
         Map<Map<String, String>, BigDecimal> currencyConversionMap = new HashMap<>();
         clientRequestList.forEach(clientRequest -> {
-            CurrencyExchangeVO currencyExchangeVO = getClientRequestService().getGson().fromJson(clientRequest.getRequestBody(), CurrencyExchangeVO.class);
+            CurrencyExchangeVO currencyExchangeVO = getGson().fromJson(clientRequest.getRequestBody(), CurrencyExchangeVO.class);
             String from = currencyExchangeVO.getFrom();
             String to = currencyExchangeVO.getTo();
             BigDecimal quantity = currencyExchangeVO.getQuantity();
@@ -112,10 +137,10 @@ public class ReportService {
         return currencyConversionMap;
     }
 
-    public Map<Map<String, String>, BigDecimal> prepareCurrencyExchangeRequests(List<ClientRequestEntity> clientRequestList) {
+    public Map<Map<String, String>, BigDecimal> prepareCurrencyExchangeRequests(List<RequestVO> clientRequestList) {
         Map<Map<String, String>, BigDecimal> currencyExchangeMap = new HashMap<>();
         clientRequestList.forEach(clientRequest -> {
-            CurrencyExchangeVO currencyExchangeVO = getClientRequestService().getGson().fromJson(clientRequest.getRequestBody(), CurrencyExchangeVO.class);
+            CurrencyExchangeVO currencyExchangeVO = getGson().fromJson(clientRequest.getRequestBody(), CurrencyExchangeVO.class);
             String from = currencyExchangeVO.getFrom();
             String to = currencyExchangeVO.getTo();
             Map<String, String> map = new HashMap<>();
@@ -129,22 +154,5 @@ public class ReportService {
             }
         });
         return currencyExchangeMap;
-    }
-
-
-    public ClientRequestService getClientRequestService() {
-        return clientRequestService;
-    }
-
-    public void setClientRequestService(ClientRequestService clientRequestService) {
-        this.clientRequestService = clientRequestService;
-    }
-
-    public CurrencyMailProxy getCurrencyMailProxy() {
-        return currencyMailProxy;
-    }
-
-    public void setCurrencyMailProxy(CurrencyMailProxy currencyMailProxy) {
-        this.currencyMailProxy = currencyMailProxy;
     }
 }
